@@ -1,0 +1,1575 @@
+---
+title: '<center> Early prediction of student`s outcome in higher education based on demographic, macroeconomic and socioeconomic factors <center>'
+author: 
+- '<center> Miras Kanatzhanov, 13075012 <center>'
+- '<center> Supervisor: Dr. Reza Mohammadi <center>'
+date: '<center> `r Sys.Date()` <center>'
+output:
+  html_document:
+    number_sections: true
+    fig_caption: true
+    toc: true
+    fig_width: 7
+    fig_height: 5
+    theme: cosmo
+    highlight: tango
+    code_folding: show
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk $ set( echo = TRUE, message = FALSE, warning = FALSE, error = FALSE, fig.align = 'center'  )
+```
+
+```{r}
+library( ggplot2 )  
+library( plyr )     
+library( liver )    
+library( forcats )  
+library( Hmisc )    
+library( naniar )   
+library( forcats )  
+library( readr )    
+library( psych )   
+library( dplyr )   
+library( corrplot ) 
+library( GGally )  
+library( tidyverse )
+library( lsr )
+library( ggcorrplot )
+library( rpart )
+library( rpart.plot )
+library( pROC )
+library( C50 )
+library( randomForest )
+library( caret )
+library( broom )
+library( car )
+```
+
+```{r results = FALSE, echo = FALSE }
+# We implement this color theme for the consistent formatting of the plots and graphs
+theme_new = theme( panel.background = element_rect( fill = "white", colour = "white", size = 0.5, linetype = "solid" ), panel.grid.major = element_line( size = 0.2, linetype = 'solid', colour = "gray77" ), panel.grid.minor = element_line( size = 0.1, linetype = 'solid', colour = "gray90" ), axis.text  = element_text( size = 11 ), axis.title = element_text( size = 12, face = "bold" ), title = element_text( size = 14, face = "bold" ))
+```
+
+```{r results = FALSE, echo = FALSE }
+rm( list=ls( ) ) # To clear the objects from the workspace in order to avoid errors of stacking datatables
+```
+
+```{r results = FALSE, echo = FALSE }
+setwd( getwd( ) )
+```
+
+```{r}
+# During transportation of the `dropout` dataset we select every variable's type separately
+# We do it because the raw data is provided in csv format which does not indicate the right variable types
+dropout <- read_delim("C:/Users/miras/Desktop/R Default Directory/Project/data_drop.csv", delim = ";", escape_double = TRUE, trim_ws = TRUE, show_col_types = TRUE, col_types = cols( 
+     `Marital status` = col_factor(),
+     `Application mode` = col_factor(),
+     `Application order` = col_factor(),
+     Course = col_factor(),
+     `Daytime/evening attendance` = col_factor(),
+     `Previous qualification` = col_factor(),
+     `Previous qualification (grade)` = col_double(),
+     Nacionality = col_factor(),
+     `Mother's qualification` = col_factor(),
+     `Father's qualification` = col_factor(),
+     `Mother's occupation` = col_factor(),
+     `Father's occupation` = col_factor(),
+     `Admission grade` = col_double(),
+     Displaced = col_factor(),
+     `Educational special needs` = col_factor(),
+     Debtor = col_factor(),
+     `Tuition fees up to date` = col_factor(),
+     Gender = col_factor(),
+     `Scholarship holder` = col_factor(),
+     `Age at enrollment` = col_integer(),
+     International = col_factor(),
+     `Curricular units 1st sem (credited)` = col_double(),
+     `Curricular units 1st sem (enrolled)` = col_double(),
+     `Curricular units 1st sem (evaluations)` = col_double(),
+     `Curricular units 1st sem (approved)` = col_double(),
+     `Curricular units 1st sem (grade)` = col_double(),
+     `Curricular units 1st sem (without evaluations)` = col_double(),
+     `Curricular units 2nd sem (credited)` = col_double(),
+     `Curricular units 2nd sem (enrolled)` = col_double(),
+     `Curricular units 2nd sem (evaluations)` = col_double(),
+     `Curricular units 2nd sem (approved)` = col_double(),
+     `Curricular units 2nd sem (grade)` = col_double(),
+     `Curricular units 2nd sem (without evaluations)` = col_double(),
+     `Unemployment rate` = col_double(),
+     `Inflation rate` = col_double(),
+     GDP = col_double(),
+     Target = col_factor()
+  ) )
+```
+
+# Introduction
+
+Academic success in higher education is vital to the job market, social justice, and economic growth. Dropout is the most problematic issue faced by the higher education institutions across the world. In the job market, a higher education degree brings significant financial benefits. Generally speaking, workers in OECD countries who have completed their university education earn twice as much on average as those who have only completed their high school education. Furthermore, a higher level of education lowers the chance of unemployment (Ortiz et al., 2013). Additionally, high dropout rates might harm an institution's reputation and hinder future recruitment efforts. This is due to the possibility that institutional dropout rates would be seen by prospective students as an indication of inadequate instruction and assistance provided by the institution. From the perspective of society, dropouts are considered to be a waste of tax resources since they prevent another student from obtaining a spot at the institution (Voelkle & Sander, 2008 in Sosu and Pheunpha, 2019). Therefore, the cause of dropout within university students is a highly researched topic. The research on dropout rates is usually country or region-specific, because that way it becomes easier for policy-makers to capture important trends and come up with suitable solutions (Ortiz et al., 2013; Beaulac, 2019; Migueis et al., 2018). Our research is based on a data set, compiled from the responses of students from a Polytechnic Institute of Portalegre, Portugal. We aim to add on to the existing research and extend the international data pool on the causes of dropout rates and contribute to the capturing of global tendencies.
+
+There is no generally accepted definition of dropping out. Depending on how screening is determined, data source and calculation methods, the proportion of students who drop out varies from study to study. Often in the research literature, dropout is analyzed based on dropout time (sooner or later) (Dobson & Henderson, 2003; Migueis et al., 2018). Due to differences in reporting, it is not possible to compare dropouts rates by institutions. In this work, we define dropouts from a micro perspective, where changes in the field of activity and institution are considered dropouts regardless of time it happens.
+
+Our data set is comprised of variables that determine the student's family history with higher education institutions and the social class background of the student, student's personal characteristic as well as factors that determine the state of the economy at the time when a specific response was collected. The data set was already pre-processed and data anomalies as well as class imbalances were handled (Martins et al., 2021). In our analysis, we will first determine variables that will be useful for determining whether a person will stay enrolled or will dropout using hypothesis testing. Afterwards, we will combine these variables into 4 classification models: CART, C5.0, logistic regression and random forest and determine which model has the highest prediction power.
+
+# Business Understanding Stage
+
+Early prediction of student outcomes has attracted increasing research interest.
+
+The dataset includes information known at the time of student enrollment (academic path, demographics, and macroeconomics and socioeconomic factors) and the students' academic performance at the end of the first and second semesters.
+
+Universities are interested to know:
+
+-   **What** are the causes or reasons of dropouts?
+-   **Why** are we losing students?
+-   **How** do we stop them from leaving the university?
+
+To answer these questions here, we use the *dropout* data set that is available here: <https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success>
+
+# Data Understanding Stage
+
+This dataset is supported by program SATDAP - Capacitacao da Administracao Publica under grant POCI-05-5762-FSE-000191, Portugal.
+
+The data set initially contains 4424 rows (student records) and 37 columns (features). The `Target` column is the target variable which indicates whether the student dropped out, enrolled in a different university, or graduated. The original 37 variables include:
+
+> 1.  `Application order`: The order in which the student applied - 'Is the university a first choice of the student, second or etc?' (Categorical-Ordinal)
+> 2.  `Daytime/evening attendance`: Whether the student attends classes during the day or in the evening. (Categorical-Binary)
+> 3.  `Previous qualification`: Previous qualification of the student. (Categorical-Nominal)
+> 4.  `Previous qualification (grade)`: Grade of previous qualification, between 0 and 200. (Numerical-Continuous)
+> 5.  `Admission grade`: Admission grade, between 0 and 200. (Numerical-Continuous)
+> 6.  `Displaced`: Whether the student is displaced from their initial home. (Categorical-Binary)
+> 7.  `Educational special needs`: Whether the student has any special educational needs. (Categorical-Binary)
+> 8.  `Debtor`: Whether the student is a debtor. (Categorical-Binary)
+> 9.  `Tuition fees up to date`: Whether the student's tuition fees are up to date. (Categorical-Binary)
+> 10. `Gender`: The gender of the student. (Categorical-Binary)
+> 11. `Scholarship holder`: Whether the student is a scholarship holder. (Categorical-Binary)
+> 12. `Age at enrollment`: The age of the student at the time of enrollment. (Numerical-Count)
+> 13. `International`: Whether the student has an international passport. (Categorical-Binary)
+> 14. `Unemployment rate`: Unemployment rate in %. (Numerical-Continuous)
+> 15. `Inflation rate`: Inflation rate in %. (Numerical-Continuous)
+> 16. `GDP`: change in GDP in %. (Numerical-Continuous)
+
+Some variables will be changed in the following `Data Preprocessing` phase in order to rationalize the *dropout* dataset. We would transform the variable `Target` because we want our target factor to be binary in order to perform learning techniques like Binary Logistic Regression.
+
+> 17. `Marital status`: The marital status of the student. Is he/she single, married or etc. (Categorical-Nominal)
+> 18. `Course`: The major taken by the student. (Categorical-Nominal)
+> 19. `Mother's qualification`: The qualification of the student's mother. (Categorical-Nominal)
+> 20. `Father's qualification`: The qualification of the student's father. (Categorical-Nominal)
+> 21. `Mother's occupation`: The occupation of the student's mother. (Categorical-Nominal)
+> 22. `Father's occupation`: The occupation of the student's father. (Categorical-Nominal)
+> 23. `Target`: Target variable. `graduate` means that the student obtained the degree in time. `enrolled` means that the student took until three extra years to obtain the degree. `dropout` means that the student took more than three extra years to obtain the degree or does not obtain the degree at all. (Categorical-Binary)
+
+However, we will not utilize some of the original variables because our research objectives do not use the information about academic progress during the studies. We focus on student factors before the admission to the university (demographic, social, macroeconomic factors, and admission specifics). Variables that would be dropped out are the records of academic performance of a student during 1st and 2nd semesters:
+
+> 24. `Curricular units 1st sem (credited)`: The number of curricular units credited by the student in the first semester. (Numerical-Continuous)
+> 25. `Curricular units 1st sem (enrolled)`: The number of curricular units enrolled by the student in the first semester. (Numerical-Continuous)
+> 26. `Curricular units 1st sem (evaluations)`: The number of curricular units evaluated by the student in the first semester. (Numerical-Continuous)
+> 27. `Curricular units 1st sem (approved)`: The number of curricular units approved by the student in the first semester. (Numerical-Continuous)
+> 28. `Curricular units 1st sem (without evaluations)`: Number of curricular units without evaluations in the 1st semester. (Numerical-Continuous)
+> 29. `Curricular units 2nd sem (credited)`: Number of curricular units credited in the 2nd semester. (Numerical-Continuous)
+> 30. `Curricular units 2nd sem (credited)`: Number of curricular units credited in the 2nd semester. (Numerical-Continuous)
+> 31. `Curricular units 2nd sem (enrolled)`: Number of curricular units enrolled in the 2nd semester. (Numerical-Continuous)
+> 32. `Curricular units 2nd sem (evaluations)`: Number of evaluations to curricular units in the 2nd semester. (Numerical-Continuous)
+> 33. `Curricular units 2nd sem (approved)`: Number of curricular units approved in the 2nd semester. (Numerical-Continuous)
+> 34. `Curricular units 2nd sem (grade)`: Grade average in the 2nd semester (between 0 and 20). (Numerical-Continuous)
+> 35. `Curricular units 2nd sem (without evaluations)`: Number of curricular units without evaluations in the 1st semester. (Numerical-Continuous)
+
+Furthermore, we will also eliminate a couple of factors that are informatively represented by other variables. First variable, `Application mode` is interconnected with such factors like `Age at enrollment` and `International`. Second variable, `Nacionality` already linked with `International` factor.
+
+> 36. `Application mode`: The method of application used by the student. (Categorical-Nominal)
+> 37. `Nacionality`: The nationality of the student. (Categorical-Nominal)
+
+Overall, untouched dataset contains 37 predictors along with the target variable `Target`.
+
+## Data Preprocessing
+
+`Nacionality` and `International` variables hold the same informational value. In the case with `Nacionality`, by unnecessary keeping such a categorical variable with many names of origin countries, the complexity of the model increases, however, `International` variable already represents whether a student has Portuguese residency (Local) or not (International). Our regression analysis formula would be enormously big which in our example is not a good practice.
+
+`Aplication mode` is already informatively connected with factors `Age at enrollment` and `International`. By removing this factor our model decreases in complexity but not in accuracy.
+
+`Curricular units` class of variables are out of scope of our research objective so we drop them.
+
+```{r}
+dropout$`Application mode` <- NULL
+dropout$`Nacionality` <- NULL 
+dropout$`Curricular units 1st sem (credited)` <- NULL
+dropout$`Curricular units 1st sem (enrolled)`<- NULL
+dropout$`Curricular units 1st sem (evaluations)` <- NULL
+dropout$`Curricular units 1st sem (approved)` <- NULL
+dropout$`Curricular units 1st sem (grade)` <- NULL
+dropout$`Curricular units 1st sem (without evaluations)` <- NULL
+dropout$`Curricular units 2nd sem (credited)` <- NULL
+dropout$`Curricular units 2nd sem (enrolled)` <- NULL
+dropout$`Curricular units 2nd sem (evaluations)` <- NULL
+dropout$`Curricular units 2nd sem (approved)` <- NULL
+dropout$`Curricular units 2nd sem (grade)` <- NULL
+dropout$`Curricular units 2nd sem (without evaluations)` <- NULL
+```
+
+Quick view at the `dropout` dataset:
+
+```{r}
+str(dropout)
+```
+
+That is how our database looks after we deleted factors that are out of scope of our research question and before the transformation of variables. We have 23 variables: 6 numeric factors, 16 categorical factors and 1 target. Earlier, the non-informative factors and variables containing data out of our research scope were eliminated. Now, we are left with 22 predictors that we want to analyze. However, before the `Explanotary Data Analysis` we need to transform some factors for the better understanding and for the preparation for analysis.
+
+## Data Transformation
+
+The untouched `dropout` database has encrypted values for categorical data. For more information about each value refer to the website: <https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success>. Because of the sheer numbers of categorical values it would be more efficient to put them in a fewer meaningful categories.
+
+First, inside the `dropout` dataframe we change the variable `Marital Status` into more easy to understand categories:
+
+```{r}
+grouping_ms <- list(
+  "Single" = c("1"), 
+  "Married" = c("2"), 
+  "Widowed" = c("3"), 
+  "Divorced" = c("4"), 
+  "Facto.Union" = c("5"), 
+  "Legally.Separated" = c("6") )
+dropout$`Marital status` <- fct_collapse(dropout$`Marital status`, !!!grouping_ms)
+```
+
+Then transform the variable `Course`:
+
+```{r}
+grouping_c <- list(
+  "Animation and Multimedia Design" = c("171"), 
+  "Tourism" = c("9254"), 
+  "Communication Design" = c("9070"), 
+  "Journalism and Communication" = c("9773"), 
+  "Management" = c("9991","9147"),
+  "Nursing" = c("9500"),
+  "Social Service" = c("9238","8014"),
+  "Advertising and Marketing Management" = c("9670"),
+  "Basic Education" = c("9853"),
+  "Veterinary Nursing " = c("9085"),
+  "Equinculture" = c("9130"),
+  "Oral Hygiene" = c("9556"),
+  "Agronomy" = c("9003"),
+  "Biofuel Production Technologies" = c("33"),
+  "Informatics Engineering" = c("9119") )
+dropout$Course <- fct_collapse(dropout$Course, !!!grouping_c)
+```
+
+We prepare and transform the `Mother's qualification` and `Father's qualification` columns to more understandable and readable groups.
+
+```{r}
+grouping_q <- list(
+  "Secondary" = c("1","7","8","10","11", "12", "15", "17"), 
+  "Secondary(<10years)" = c("9","18", "20", "21", "14", "19", "38"), 
+  "Basic" = c("27", "28", "37" ), 
+  "Higher(bachelor's)" = c("2","3","6", "30","40", "41", "42"), 
+  "Higher(>=master's)" = c("4", "5", "33", "34", "31", "43", "44"), 
+  "Vocational/Technical" = c("32", "13", "16", "29","22", "23", "39", "41"), 
+  "Unknown/Incomplete" = c("24", "25", "26", "35", "36") )
+dropout$`Mother's qualification` <- fct_collapse(dropout$`Mother's qualification`, !!!grouping_q)
+dropout$`Father's qualification` <- fct_collapse(dropout$`Father's qualification`, !!!grouping_q)
+```
+
+Similarly, we transform categories for `Mother's occupation` and `Father's occupation`:
+
+```{r}
+grouping_m <- list(
+  "Student" = c("0"), 
+  "Public.Administration" = c("1"), 
+  "Healthcare" = c("122", "132"), 
+  "Science.Specialist" = c("2", "125"), 
+  "Science.Intermediate" = c("131", "134", "3"), 
+  "Armed.Forces" = c("10"),
+  "Teacher" = c("123"), 
+  "Administrative.Support" = c("4", "141", "143", "144"), 
+  "Service" = c("5", "151", "152", "153"), 
+  "Skilled.Professions" = c("6", "7", "171", "173", "175"), 
+  "Manufacturing" = c("8"), 
+  "Unskilled.Professions" = c("9", "192", "193", "194", "191"), 
+  "Other.or.Blank" = c("90", "99"))
+
+grouping_f <- list(
+  "Student" = c("0"), 
+  "Teacher" = c("123"),
+  "Public.Administration" = c("1"), 
+  "Armed.Forces" = c("101", "102", "103", "10"), 
+  "Management" = c("112", "114"), 
+  "Science.Specialist" = c("124", "2", "121" ), 
+  "Intermediate.Technicians" = c("131", "135","134", "3"), 
+  "Healthcare" = c("122", "132"), 
+  "Administrative.Support" = c("143", "144", "4", "141"), 
+  "Service" = c("5", "151", "152", "153", "154"), 
+  "Skilled.Professions" = c("6", "7", "161", "163", "171", "172", "174", "175"), 
+  "Manufacturing" = c("8", "181", "182", "183"), 
+  "Unskilled.Professions" = c("9", "192", "193", "194","195" ), 
+  "Other.or.Blank"= c("90", "99") )
+dropout$`Mother's occupation` <- fct_collapse(dropout$`Mother's occupation`, !!!grouping_m)
+dropout$`Father's occupation` <- fct_collapse(dropout$`Father's occupation`, !!!grouping_f)
+```
+
+Same for variable `Previous qualification`:
+
+```{r}
+grouping_p <- list(
+  "Basic" = c("19", "38", "14", "15" ), 
+  "Secondary" = c("1", "9", "10", "12"), 
+  "Higher(bachelor's)" = c("2", "3", "40"), 
+  "Higher(>=master's)" = c("4", "5", "43"), 
+  "Specialized" = c("39", "42"),
+  "Other.or.Blank" = c("6"))
+dropout$`Previous qualification` <- fct_collapse(dropout$`Previous qualification`, !!!grouping_p)
+```
+
+Additionally, we want to change binary variables with outcome values being equal to 1/0 into categorical with "Yes"/"No". This is done for further more understandable work with the dataset. We changed variables `Daytime/evening attendance` (also renamed it), `Displaced`, `Educational special needs`, `Debtor`, `Tuition fees up to date`, `Gender`, `Scholarship holder`, and `International`.
+
+```{r}
+names(dropout)[names(dropout) == "Daytime/evening attendance"] <- "Evening attendance" 
+dropout$`Evening attendance` <- gsub(0,"Yes",dropout$`Evening attendance`)
+dropout$`Evening attendance` <- gsub(1,"No",dropout$`Evening attendance`)
+dropout$`Evening attendance` <- as.factor(dropout$`Evening attendance`)
+
+dropout$`Displaced` <- gsub(1,"Yes",dropout$`Displaced`)
+dropout$`Displaced` <- gsub(0,"No",dropout$`Displaced`)
+dropout$`Displaced` <- as.factor(dropout$`Displaced`)
+
+dropout$`Educational special needs` <- gsub(1,"Yes",dropout$`Educational special needs`)
+dropout$`Educational special needs` <- gsub(0,"No",dropout$`Educational special needs`)
+dropout$`Educational special needs` <- as.factor(dropout$`Educational special needs`)
+
+dropout$`Debtor` <- gsub(1,"Yes",dropout$`Debtor`)
+dropout$`Debtor` <- gsub(0,"No",dropout$`Debtor`)
+dropout$`Debtor` <- as.factor(dropout$`Debtor`)
+
+dropout$`Tuition fees up to date` <- gsub(1,"Yes",dropout$`Tuition fees up to date`)
+dropout$`Tuition fees up to date` <- gsub(0,"No",dropout$`Tuition fees up to date`)
+dropout$`Tuition fees up to date` <- as.factor(dropout$`Tuition fees up to date`)
+
+dropout$`Gender` <- gsub(1,"Male",dropout$`Gender`)
+dropout$`Gender` <- gsub(0,"Female",dropout$`Gender`)
+dropout$`Gender` <- as.factor(dropout$`Gender`)
+
+dropout$`Scholarship holder` <- gsub(1,"Yes",dropout$`Scholarship holder`)
+dropout$`Scholarship holder` <- gsub(0,"No",dropout$`Scholarship holder`)
+dropout$`Scholarship holder` <- as.factor(dropout$`Scholarship holder`)
+
+dropout$`International` <- gsub(1,"Yes",dropout$`International`)
+dropout$`International` <- gsub(0,"No",dropout$`International`)
+dropout$`International` <- as.factor(dropout$`International`)
+```
+
+The factor level "Enrolled" represents the people, who changed their course of studies. We decided to combine the levels "Enrolled" and "Graduate" into one category "Stayed.enrolled" which are inside the variable `Target`. It is done because the prediction algorithms we would work with rely on binary target variable. Second factor level is called "Dropout" and is left unchanged.
+
+```{r}
+dropout <- dropout %>% mutate(Target = ifelse(Target %in% c("Enrolled", "Graduate"), "Stayed.enrolled", Target))
+dropout <- dropout %>% mutate(Target = ifelse(Target %in% 1, "Dropout", Target))
+dropout$Target <- as.factor(dropout$Target)
+```
+
+## Outliers and Unusual values
+
+The research team that gathered information about the dropout rates across Portugal (Martins et al., 2021) stated that they released the `dropout` dataset cleansed from any outliers or missing values.
+
+However, some mistakes were kept in the `Application order` variable. For some reason, the column includes values of "0" and "9" that both appear only once throughout the set. Zero value does not make sense because a student cannot chose university as their 0th choice. Value "9" supposedly tells that a student chose university as their 9th choice. Although, choice of the 9th university potentially can happen in real life but it is clearly an outlier in our dataset, especially when the previous category is a "6".
+
+Checking to see the values of the variable `Application order`:
+
+```{r}
+ao_specific_value <- c(0, 1, 2, 3, 4, 5, 6, 9)
+ao_value_counts <- table(dropout$`Application order`)
+ao_count_of_specific_value <- ao_value_counts[as.character(ao_specific_value)]
+print(ao_count_of_specific_value)
+```
+
+Leaving outliers untreated would harm the accuracy of the analysis, however, it would not be right to just delete observations from the dataset. Therefore, to treat the outliers we would join those two observations into their closest neighboring categories. For instance, 0th choice becomes the 1st and 9th becomes the 6th.
+
+```{r}
+grouping_a <- list(
+  "1" = c("0", "1" ), 
+  "2" = c("2"), 
+  "3" = c("3"), 
+  "4" = c("4"), 
+  "5" = c("5"),
+  "6" = c("6", "9") )
+dropout$`Application order` <- fct_collapse(dropout$`Application order`, !!!grouping_a)
+```
+
+Again checking the `Application order` variable:
+
+```{r}
+ao_specific_value <- c(1, 2, 3, 4, 5, 6 )
+ao_value_counts <- table(dropout$`Application order`)
+ao_count_of_specific_value <- ao_value_counts[as.character(ao_specific_value)]
+print(ao_count_of_specific_value)
+```
+
+As we can see, there is no more outliers/unusual values in `Application order` variable.
+
+Next, we would examine numerical variables in the dataset for unusual values.
+
+Checking the variable `Age at enrollment`:
+
+```{r fig.align = 'center'}
+ggplot( data = dropout ) +
+    geom_histogram( aes( x = `Age at enrollment` ), binwidth = 1, color = "white") 
+ggplot( data = dropout ) +
+    geom_histogram( mapping = aes( x = `Age at enrollment`), binwidth = 1, color = "white" ) +
+    coord_cartesian( ylim = c( 0, 30 ) )
+```
+
+In the dataset there is one student, whose age is 70 years old, which might look as an outlier. However, we will not manipulate it in any way, it simply means that a person enrolled to the university while being 70 years old.
+
+We check other numerical variables `Unemployment rate`, `Inflation rate` and `GDP`.
+
+```{r fig.align = 'center'}
+ggplot( data = dropout ) +
+    geom_histogram( aes( x = `Unemployment rate`), binwidth = 1, color = "white") 
+
+ggplot( data = dropout ) +
+    geom_histogram( aes( x = `Inflation rate`), binwidth = 1, color = "white") 
+
+ggplot( data = dropout ) +
+    geom_histogram( aes( x = `GDP`), binwidth = 1, color = "white") 
+```
+
+Variables `Unemployment rate`, `Inflation rate` and `GDP`also have not shown any unusual values.
+
+We also check variables `Previous qualification (grade)` and `Admission grade` for outliers:
+
+```{r fig.align = 'center'}
+ggplot( data = dropout ) +
+      geom_histogram( aes( x = `Previous qualification (grade)`), binwidth = 1, color = "white")
+ggplot( data = dropout ) +
+      geom_histogram( aes( x = `Previous qualification (grade)`), binwidth = 1, color = "white") + 
+  coord_cartesian( ylim = c( 0, 20 ) )
+```
+
+```{r fig.align = 'center'}
+ggplot( data = dropout ) +
+      geom_histogram( aes( x = `Admission grade`), binwidth = 1, color = "white") 
+ggplot( data = dropout ) +
+      geom_histogram( aes( x = `Admission grade`), binwidth = 1, color = "white") + 
+  coord_cartesian( ylim = c( 0, 20 ) )
+```
+
+Both distribution of `Previous qualification (grade)` and `Admission grade` do not look like normal distributions because the graphs have many unusual spikes that are sticking out from the pattern. Those spikes represent a number of people attaining round grades like 100, 130 or 150. This is a "round number bias" which states that people have psychological tendency to prefer round numbers over others.
+
+For instance, we can compare number of students with round and non-round `Admission grade`:
+
+```{r}
+specific_value <- c(127, 128, 129, 130, 131, 132, 133)
+value_counts <- table(dropout$`Admission grade`)
+count_of_specific_value <- value_counts[as.character(specific_value)]
+print(count_of_specific_value)
+```
+
+And for `Previous qualification (grade)`:
+
+```{r}
+specific_value <- c(127, 128, 129, 130, 131, 132, 133)
+value_counts <- table(dropout$`Previous qualification (grade)`)
+count_of_specific_value <- value_counts[as.character(specific_value)]
+print(count_of_specific_value)
+```
+
+In both variables, number of students who attained round grade of 130 is several times higher than neighboring non-round grades. Such bias is normal at educational institutions and there is no need to treat the values in `Previous qualification (grade)` and `Admission grade` variables.
+
+After all transformations and treatments
+
+```{r}
+str(dropout)
+```
+
+# Exploratory Data Analysis (EDA)
+
+## Investigate the target variable
+
+First, we investigate the target variable `Target`, which shows whether the person has dropped out or stayed enrolled.
+
+```{r fig.align = 'center'}
+ggplot( data = dropout ) + 
+    geom_bar( aes( x = Target ), binwidth = 1, color="white", fill = c( "#999999", "#E69F00" ) )  +
+    labs( title = "Bar plot of the variable 'Target'" )  
+```
+
+Summary for the target variable `Target`:
+
+```{r}
+summary( dropout $ Target )
+```
+
+Around 32% of all students never finished their studies. Compared to other European countries' dropout rate, Portugal looks alike Italy and Slovenia which also have dropout rate higher than 30% (Kehm et al., 2019).
+
+## Investigate variable *Marital status*
+
+Relationship between variable `Target` and `Marital status`:
+
+```{r}
+ggplot( data = dropout ) + 
+  geom_bar( aes( x = `Marital status`, fill = `Target` ), position = "stack", binwidth = 1000, color="white" ) +
+  theme(axis.text.x = element_text(size = 5)) +
+  scale_fill_manual( values = c( "#999999", "#E69F00" ) ) + 
+  coord_flip()
+ggplot( data = dropout ) + 
+  geom_bar( aes( x = `Marital status`, fill = `Target` ), position = "fill", binwidth = 1000, color="white" ) +
+  theme(axis.text.x = element_text(size = 5)) +
+  scale_fill_manual( values = c( "#999999", "#E69F00" ) ) + 
+  coord_flip()
+```
+
+```{r}
+table( dropout $ `Target`, dropout $ `Marital status`, dnn = c( "Target", "Marital status" ) )
+```
+
+We can observe a clear inequality in the proportion of students within the categories. The leading category is "Single" out of which approximately 70% of student stayed enrolled. It is understandable that most of the students enroll into he universities in the early stages of their lives and get married only after graduation. Because, there is still 20% difference in proportions between the most popular category and the second most popular category "Married", we will conduct a Chi-Square test with significance level $\alpha=0.05$ to check whether this difference is statistically significant.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{Legally.Separated, \ dropout} = \pi_{Facto.Union, \ dropout} = \pi_{Widowed, \ dropout} = \pi_{Divorced, \ dropout} = \pi_{Married, \ dropout} = \pi_{Sindle, \ dropout} \\
+    H_a: At \ least \ one \ of \ the \ claims \ in \ H_0 \ is \ wrong.
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Marital status` ) )
+```
+
+Since the p-value (1.582e-11) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the marital status of the students, who stayed enrolled and dropped out is statistically significant. This means that the variable `Marital status` is useful to predict the target variable `Target`.
+
+## Investigate variable *Application order*
+
+```{r}
+dropout$`Application order` <- factor(dropout$`Application order`, levels = c("1", "2", "3", "4", "5", "6"))
+
+ggplot( data = dropout ) + 
+  geom_bar( aes( x = `Application order`, fill = `Target` ),   
+  position =    "stack", binwidth = 1000, color="white" ) + 
+  theme(axis.text.x = element_text(size = 4)) +
+  scale_fill_manual( values = c( "#999999", "#E69F00" ) ) + coord_flip() 
+  
+ggplot( data = dropout ) + 
+  geom_bar( aes( x = `Application order`, fill = `Target` ),   
+  position =    "fill", binwidth = 1000, color="white" ) + 
+  theme(axis.text.x = element_text(size = 4)) +
+  scale_fill_manual( values = c( "#999999", "#E69F00" ) )+ 
+  coord_flip()
+  
+```
+
+From the graph we can see an interesting finding. Highest dropout rates have students who were admitted to the university of their first choice. Lowest dropout rates have students who applied and got admitted to the university of their last choice. Maybe it is cause by the fact that people who chose national Portuguese universities as their last choice prioritize studies in other universities abroad. Therefore, such students are more educationally capable if they have an option to study abroad in the first place.
+
+We still want to check if the variable `Application order` is a good predictor for `Target`. To test our results we need to implement a Chi-square test with significance level $\alpha=0.05$.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{1,dropout} = \pi_{2,dropout} = \pi_{3,dropout} = \pi_{4,dropout} = \pi_{5,dropout} = \pi_{6,dropout},   \\
+    H_a: At \ least \ one \ of \ the \ claims \ in \ H_0 \ is \ wrong.
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Application order` ) )
+```
+
+Since the p-value (2.849e-07) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the application order of the student has a statistically significant impact on the choice of a student to dropout or to stay enrolled. This means that the variable `Application order` is useful to predict the target variable `Target`.
+
+## Investigate variable *Course*
+
+```{r}
+ggplot( data = dropout ) + 
+  geom_bar( aes( x = fct_infreq(`Course`), fill = `Target` ),   
+  position =    "stack", binwidth = 1000, color="white" ) + 
+  theme(axis.text.x = element_text(size = 4)) +
+  scale_fill_manual( values = c( "#999999", "#E69F00" ) ) +  xlab("Course") + 
+  coord_flip()
+ggplot( data = dropout ) + 
+  geom_bar( aes( x = fct_infreq(`Course`), fill = `Target` ),   
+  position = "fill", binwidth = 1000, color="white" ) + 
+  theme(axis.text.x = element_text(size = 4)) +
+  scale_fill_manual( values = c( "#999999", "#E69F00" ) ) + xlab("Course") +
+  coord_flip()
+  
+```
+
+Looking at the distribution of dropout rates between the courses, we observe a fluctuation of the dropout rate with highest peaks at the "Biofuel Production Technologies" and "Equinculture". The course that has the least dropouts is "Nursing". Therefore, we will test our results with a Chi-square test with significance level $\alpha=0.05$.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{1} = \pi_{2} = \pi_{3} = \pi_{4} = \pi_{5} = \pi_{6} = \pi_{7} = \pi_{8} = \pi_{9}  = \pi_{10}  = \pi_{11}  = \pi_{12} = \pi_{13}= \pi_{14}= \pi_{15}\\
+    H_a: At \ least \ one \ of \ the \ claims \ in \ H_0 \ is \ wrong.
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Course` ) )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the dropout rate between the courses, that students are enrolled in is statistically significant. This means that the variable `Course` is useful to predict the target variable `Target`.
+
+## Investigate variable *Evening attendance*
+
+```{r}
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Evening attendance`, fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Evening attendance`, fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+```
+
+We see that the dropout rate is around 10% higher for the students, who are attending evening education. This might be related to the fact, that students studying during daytime will focus more to their studies. We will conduct a Chi-square hypothesis test with significance level $\alpha=0.05$ to further prove this point.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{evening \ attendance, \ dropout}   =  \pi_{(not) \ evening \ attendance, \ dropout},   \\
+    H_a: \pi_{evening \ attendance,\ dropout} \neq \pi_{(not) \ evening \ attendance, \ dropout}. 
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Evening attendance` ) )
+```
+
+Since the p-value (1.142e-07) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference of the dropout rate in the proportions of students, who attend the evening studies and who do not is statistically significant. This means that the variable `Evening attendance` is useful to predict the target variable `Target`.
+
+## Investigate variable *Previous qualification*
+
+Relationship between `Target` and `Previous qualification`
+
+```{r}
+dropout$`Previous qualification` <- factor(dropout$`Previous qualification`, levels = c("Higher(>=master's)", "Higher(bachelor's)", "Secondary", "Specialized", "Basic", "Other.or.Blank"))
+
+ggplot( data = dropout ) + 
+  geom_bar( aes( x = `Previous qualification`, fill = `Target` ),   
+  position =    "stack", binwidth = 1000, color="white" ) + 
+  theme(axis.text.x = element_text(size = 4)) +
+  scale_fill_manual( values = c( "#999999", "#E69F00" ) ) + 
+  coord_flip()
+ggplot( data = dropout ) + 
+  geom_bar( aes( x = `Previous qualification`, fill = `Target` ),   
+  position =    "fill", binwidth = 1000, color="white" ) + 
+  theme(axis.text.x = element_text(size = 4)) +
+  scale_fill_manual( values = c( "#999999", "#E69F00" ) )+ 
+  coord_flip()
+  
+```
+
+```{r}
+table( dropout $ `Target`, dropout $ `Previous qualification`, dnn = c( "Target", "Previous qualification" ) )
+```
+
+We can observe a clear inequality in the proportion of students within the categories. However, from the second graph, it is clear that the categories "Secondary" and "Specialized" have the lowest dropout rate (around 70% of students stayed enrolled). That might be also related to the age of the students, since students with those previous qualifications are usually the youngest. Students with only "Basic" education probably experience the biggest dropout rate because of unpreparedness to the academically challenging environment. Therefore, we will conduct a Chi-Square test with significance level $\alpha=0.05$ to check whether this difference in categories is statistically significant.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{Other.or.Blank, \ dropout} = \pi_{Higher(>=master's), \ dropout} = \pi_{Higher(bachelor's), \ dropout} = \pi_{Specialized, \ dropout} = \pi_{Basic, \ dropout} = \pi_{Secondary, \ dropout} \\
+    H_a: At \ least \ one \ of \ the \ claims \ in \ H_0 \ is \ wrong.
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Previous qualification` ) )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the previous qualification of the students, who stayed enrolled and dropped out is statistically significant. This means that the variable `Previous qualification` is useful to predict the target variable `Target`.
+
+## Investigate variables *Previous qualification (grade)* and *Admission grade* 
+
+Relationship between `Target` and `Previous qualification (grade)`/`Admission grade`:
+
+```{r}
+ggplot (data = dropout, aes(x=`Target`, y=`Previous qualification (grade)`)) + 
+  geom_boxplot(fill= c( "#999999", "#E69F00" ) )
+ggplot( data = dropout ) +
+  geom_density( aes( x = `Previous qualification (grade)`, fill = `Target`), alpha = 0.3 ) + scale_fill_manual(values = c( "#999999", "#E69F00" ) )
+
+ggplot (data = dropout, aes(x=`Target`, y=`Admission grade`)) + 
+  geom_boxplot(fill= c( "#999999", "#E69F00" ) )
+ggplot( data = dropout ) +
+  geom_density( aes( x = `Admission grade`, fill = `Target`), alpha = 0.3 ) + scale_fill_manual(values = c( "#999999", "#E69F00" ) )
+```
+
+Box plots with `Previous qualification (grade)` and `Admission grade` show significant differences in IQR of groups of students who dropped out and who did not. Graphically, those variables are good predictors for the target variable `Target`.
+
+Above density plots show slight fluctuations among previous/entrance grades of students who dropped out or who stayed enrolled. The nature of both variables `Previous qualification (grade)` and `Admission grade` is quite similar to each other so we want to test their correlation.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+          H_0:  \rho \leq 0, \\
+          H_a:  \rho   > 0.
+\end{matrix}
+$$
+
+```{r}
+cor.test( x = dropout $ `Admission grade`, 
+          y = dropout $ `Previous qualification (grade)`, 
+          alternative = "greater", 
+          conf.level = 0.975 )
+```
+
+We reject the $H_0$, since the p-value is less than 2.2e-16 which means it is too small, close to zero. It means with a 97.5% confidence the variables `Previous qualification (grade)` and `Admission grade` have a positive relationship which means the higher grade that student had during previous studies the higher grade he has for the admission. However, the correlation is not too high to consider eliminating one of the factors.
+
+## Investigate variables *Mother's qualification, Mother's occupation, Father's qualification, Father's occupation*
+
+Relationship between `Target` and `Mother's qualification`, `Mother's occupation`, `Father's qualification`, `Father's occupation`
+
+```{r}
+dropout$`Mother's qualification` <- factor(dropout$`Mother's qualification`, levels = c("Higher(>=master's)", "Higher(bachelor's)", "Secondary", "Secondary(<10years)", "Basic", "Vocational/Technical", "Unknown/Incomplete"))
+
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Mother's qualification`, fill = `Target`), position = "stack", binwidth = 1000, color="white") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) + 
+  coord_flip()
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Mother's qualification`, fill = `Target`), position = "fill", binwidth = 1000, color="white") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) + 
+  coord_flip()
+```
+
+```{r}
+table( dropout $ `Target`, dropout $ `Mother's qualification`, dnn = c( "Target", "Mother's qualification" ) )
+```
+
+We can observe a clear inequality in the proportion of the categories. The above plot does not indicate a strong graphical evidence of the predictive importance of the variable `Mother's qualification`. The result are also a bit counter intuitive. The expected result would be that the dropout rate would be the lowest for the student's, whose mother has a higher education. Because of this, we will test our results with a Chi-square test with significance level $\alpha=0.05$.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{Unknown/Incomplete, \ dropout} = \pi_{Vocational/Technical, \ dropout} = \pi_{Higher(>=master's), \ dropout} = \pi_{Higher(bachelor's), \ dropout} = \pi_{Basic, \ dropout} = \pi_{Secondary, \ dropout} = \pi_{Secondary(<10years), \ dropout} \\
+    H_a: At \ least \ one \ of \ the \ claims \ in \ H_0 \ is \ wrong.
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Mother's qualification` ) )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the qualification of the student's mother has a statistically significant impact on the choice of a student to dropout or to stay enrolled. This means that the variable `Mother's qualification` is useful to predict the target variable `Target`.
+
+```{r}
+ggplot(data = dropout) +
+  geom_bar(aes(x = fct_infreq(`Mother's occupation`), fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) + xlab("Mother's occupation") + 
+  coord_flip()
+ggplot(data = dropout) +
+  geom_bar(aes(x = fct_infreq(`Mother's occupation`), fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) +   xlab("Mother's occupation") + 
+  coord_flip()
+
+```
+
+```{r}
+table( dropout $ `Target`, dropout $ `Mother's occupation`, dnn = c( "Target", "Mother's occupation" ) )
+```
+
+We can observe a clear inequality in the proportion of the categories.The above plot does not indicate a strong graphical evidence of the predictive importance of the variable `Mother's occupation`. However, we observe that the dropout rate is the highest for the categories "Student" and "Other.or.Blank", which is very intuitive. The student might have wanted to have the financial stability, that their parent couldn't provide, so they went to the the job market without graduating. Because of this, we will test our results with a Chi-square test with significance level $\alpha=0.05$
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{1} = \pi_{2} = \pi_{3} = \pi_{4} = \pi_{5} = \pi_{6} = \pi_{7} = \pi_{8} = \pi_{9}  = \pi_{10}  = \pi_{11}  = \pi_{12} = \pi_{13}\\
+    H_a: At \ least \ one \ of \ the \ claims \ in \ H_0 \ is \ wrong.
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Mother's occupation` ) )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the occupation of the student's mother has a statistically significant impact on the choice of a student to dropout or to stay enrolled. This means that the variable `Mother's occupation` is useful to predict the target variable `Target`.
+
+```{r}
+dropout$`Father's qualification` <- factor(dropout$`Father's qualification`, levels = c("Higher(>=master's)", "Higher(bachelor's)", "Secondary", "Secondary(<10years)", "Basic", "Vocational/Technical", "Unknown/Incomplete"))
+
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Father's qualification`, fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) + 
+  coord_flip()
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Father's qualification`, fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) +  
+  coord_flip()
+
+```
+
+We can observe a clear inequality in the proportion of the categories.The above plot does not indicate a strong graphical evidence of the predictive importance of the variable `Father's qualification`. The results are counter intuitive as, for instance, the dropout rate for the students whose father has less than 10 years of secondary education is a lot less than for the students, whose father has a master's degree or higher . Because of this, we will test our results with a Chi-square test with significance level $\alpha=0.05$
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{Unknown/Incomplete, \ dropout} = \pi_{Vocational/Technical, \ dropout} = \pi_{Higher(>=master's), \ dropout} = \pi_{Higher(bachelor's), \ dropout} = \pi_{Basic, \ dropout} = \pi_{Secondary, \ dropout} = \pi_{Secondary(<10years), \ dropout} \\
+    H_a: At \ least \ one \ of \ the \ claims \ in \ H_0 \ is \ wrong.
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Mother's occupation` ) )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the qualification of the student's father has a statistically significant impact on the choice of a student to dropout or to stay enrolled. This means that the variable `Father's qualification` is useful to predict the target variable `Target`.
+
+```{r}
+ggplot(data = dropout) +
+  geom_bar(aes(x = fct_infreq(`Father's occupation`), fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) + xlab("Father's occupation")+
+  coord_flip()
+ggplot(data = dropout) +
+  geom_bar(aes(x = fct_infreq(`Father's occupation`), fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) + xlab("Father's occupation") +  
+  coord_flip()
+
+```
+
+```{r}
+table( dropout $ `Target`, dropout $ `Father's occupation`, dnn = c( "Target", "Father's occupation" ) )
+```
+
+We can observe a clear inequality in the proportion of the categories.The above plot does not indicate a strong graphical evidence of the predictive importance of the variable `Father's occupation`. However, we observe that the dropout rate is the highest for the categories "Student" and "Other.or.Blank", which is very intuitive. The student might have wanted to have the financial stability, that their parent couldn't provide, so they went to the the job market without graduating. The observed relationship is very similar to the relationship between the variable `Mother's occupation`. Because of this, we will test our results with a Chi-square test with significance level $\alpha=0.05$.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{1} = \pi_{2} = \pi_{3} = \pi_{4} = \pi_{5} = \pi_{6} = \pi_{7} = \pi_{8} = \pi_{9}  = \pi_{10}  = \pi_{11}  = \pi_{12} = \pi_{13} = \pi_{14}\\
+    H_a: At \ least \ one \ of \ the \ claims \ in \ H_0 \ is \ wrong.
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Father's occupation` ) )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the occupation of the student's father has a statistically significant impact on the choice of a student to dropout or to stay enrolled. This means that the variable `Father's occupation` is useful to predict the target variable `Target`.
+
+## Investigate variable *Displaced*
+
+```{r}
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Displaced`, fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Displaced`, fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+```
+
+We see that the dropout rate is almost 20% higher for the students, who are not displaced. This constitutes a significant difference and might be related to the fact, that displaced students will hold on more to their spot in the university. We will conduct a Chi-square hypothesis test with significance level $\alpha=0.05$ to further prove this point.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{displaced,dropout}   =  \pi_{(not)displaced,dropout },   \\
+    H_a: \pi_{displaced,dropout} \neq \pi_{(not)displaced,dropout }. 
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Displaced` ) )
+```
+
+Since the p-value (1.247e-12) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference of the dropout rate in the proportions of students , who are and are not displaced is statistically significant. This means that the variable `Displaced` is useful to predict the target variable `Target`.
+
+## Investigate variable *Educational special needs*
+
+```{r}
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Educational special needs`, fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Educational special needs`, fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+```
+
+Form the first bar chart, we can see that the proportion of people with educational needs is insignificant compared to the other proportion, therefore, it will be difficult to derive any conclusions from this relationship. We will conduct a Chi-square hypothesis test with significance level $\alpha=0.05$ to further prove this point.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{educational \ needs, \ dropout}   =  \pi_{(no)educational \ needs, \ dropout },   \\
+    H_a: \pi_{educational \ needs, \ dropout} \neq \pi_{(no)educational \ needs, \ dropout }. 
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Educational special needs` ) )
+```
+
+Since the p-value (0.9714) is more than $\alpha=0.05$, thus we do not reject the $H_0$. Therefore, the difference of the dropout rate in the proportions of students , who have educational special needs and who do not is statistically significant. This means that the variable `Educational special needs` is not useful to predict the target variable `Target`.
+
+## Investigate variable *Debtor*
+
+```{r}
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Debtor`, fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Debtor`, fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+```
+
+Form the first bar chart, we can see that the proportion of students with a debt is a lot smaller than the proportion of students without a debt, therefore, it will be difficult to derive any conclusions from this relationship. However, from the second bar plot, we observe a significant (around 30%) difference in the dropout rate. The students with a debt are more likely to drop out. Therefore, we will conduct a Chi-square hypothesis test with significance level $\alpha=0.05$ to make a conclusion about this relationship.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{debtor,dropout}   =  \pi_{(not)debtor,dropout },   \\
+    H_a: \pi_{debtor,dropout} \neq \pi_{(not)debtor,dropout }. 
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Debtor` ) )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference of the dropout rate in the proportions of debtors and non-debtors is statistically significant. This means that the variable `Debtor` is useful to predict the target variable `Target`.
+
+## Investigate variable *Tuition fees up to date*
+
+```{r}
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Tuition fees up to date`, fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Tuition fees up to date`, fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+```
+
+Form the first bar chart, we can see that the proportion of students with outstanding tuition fees is a lot smaller than the proportion of students with tuition fees up to date , therefore, it will be difficult to derive any conclusions from this relationship. However, from the second bar plot, we observe a significant (around 60%) difference in the dropout rate. Students with tuition fees outstanding are a lot more likely to drop out. Therefore, we will conduct a Chi-square hypothesis test with significance level $\alpha=0.05$ to make a conclusion about this relationship.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{tuitions,dropout}   =  \pi_{(no)tuitions,dropout },   \\
+    H_a: \pi_{tuitions,dropout} \neq \pi_{(no)tuitions,dropout }. 
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Tuition fees up to date` ) )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the dropout rate in the proportions of the students, who's tuition fees are up to date and who's are not is statistically significant. This means that the variable `Tuition fees up to date` is useful to predict the target variable `Target`.
+
+## Investigate variable *Gender*
+
+```{r}
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Gender`, fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Gender`, fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+```
+
+From the bar plots above, we can see that although the proportion of males is smaller, there is still about a 15% difference in the dropout proportion within two groups, it is higher for males. We will conduct a Chi-square hypothesis test with significance level $\alpha=0.05$ to further prove our assumption.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{male,dropout}   =  \pi_{female,dropout },   \\
+    H_a: \pi_{male,dropout} \neq \pi_{female,dropout }. 
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Gender` ) )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the dropout rate is statistically significant between males and females. This means that the variable `Gender` is useful to predict the target variable `Target`.
+
+## Investigate variable *Scholarship holder*
+
+```{r}
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Scholarship holder`, fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+ggplot(data = dropout) +
+  geom_bar(aes(x = `Scholarship holder`, fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+```
+
+From the bar plots above, we can see that although the proportion of the scholarship holders is a lot smaller, there is still about a 25% difference in the dropout proportion within two groups. The dropout rate is a lot lower for scholarship holders, as they are usually more academically successful students that are holding onto the financial aid from the university of the government. We will conduct a Chi-square hypothesis test with significance level $\alpha=0.05$ to further prove our assumption.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{scholarship,dropout}   =  \pi_{(no)scholarship,dropout },   \\
+    H_a: \pi_{scholarship,dropout} \neq \pi_{(no)scholarship,dropout }. 
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `Scholarship holder` ) )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the dropout rate is statistically significant between the scholarship holders and other students. This means that the variable `Scholarship holder` is useful to predict the target variable `Target`.
+
+## Investigate variable *Age at enrollment*
+
+```{r}
+ggplot (data = dropout, aes(x=`Target`, y=`Age at enrollment`), binwidth = 1000, color="white") + 
+  geom_boxplot(fill= c( "#999999", "#E69F00" ) ) 
+ggplot( data = dropout ) +
+  geom_density( aes( x = `Age at enrollment`, fill = `Target`), alpha = 0.3 ) + scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+```
+
+From the box plots we learn that the interquartile range for students who dropped out is more than twice as large than for students, who stayed enrolled. Additionally, the median of the group, which dropped out seems to be at a higher age. That means that `Age at enrollment` may be an important factor for predicting `Target`. The density plot confirms the previous statement.
+
+Although, both of the categories have a mean of around 18 years old, the difference in the density of those categories is significant.
+
+We further test the relationship between `Target` and `Age at enrollment`, we will conduct a Two-Sample T-test fo the difference in means with significance level $\alpha=0.05$.
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \mu_1   =  \mu_2,   \\
+    H_a: \mu_1 \neq \mu_2. 
+\end{matrix}
+$$
+
+```{r}
+t.test( `Age at enrollment` ~ `Target`, data = dropout )
+```
+
+Since the p-value (2.2e-16) is less than $\alpha=0.05$, thus we reject the $H_0$. Therefore, the difference in the age of the students, who stayed enrolled and dropped out is statistically significant. This means that the variable `Age at enrollment` is useful to predict the target variable `Target`.
+
+## Investigate variable *International*
+
+```{r}
+ggplot(data = dropout) +
+  geom_bar(aes(x = `International`, fill = `Target`), position = "stack") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+ggplot(data = dropout) +
+  geom_bar(aes(x = `International`, fill = `Target`), position = "fill") +
+  scale_fill_manual(values = c( "#999999", "#E69F00" ) ) 
+```
+
+```{r}
+table( dropout $ `Target`, dropout $ `International`, dnn = c( "Target", "International" ) )
+```
+
+The `dropout` dataset contains information about 4314 students with Portuguese residence and 110 with International residency. It means that only 2.5% of all students came from abroad. From the graphs it is not fully clear if `International` factor makes a big difference on the dropout rate. So we would perform Chi-square hypothesis test with significance level $\alpha=0.05$.
+
+Our hypotheses are:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{international,dropout}   =  \pi_{international,dropout },   \\
+    H_a: \pi_{international,dropout} \neq \pi_{international,dropout }. 
+\end{matrix}
+$$
+
+```{r}
+chisq.test( table(dropout $ `Target`, dropout $ `International` ) )
+```
+
+Since the p-value equals to 0.5581 which is higher than $\alpha=0.05$, thus we do not reject the $H_0$. Therefore, the difference in the dropout rate is statistically insignificant between international and local students. This means that the variable `International` is not a good predictor of variable `Target`.
+
+## Investigate variable *Unemployment rate*
+
+```{r}
+ggplot (data = dropout, aes( x=`Target`, y=`Unemployment rate`)) + 
+  geom_boxplot(fill= c( "#999999", "#E69F00" ) )
+ggplot( data = dropout ) +
+  geom_density( aes( x = `Unemployment rate`, fill = `Target`), alpha = 0.3 ) + scale_fill_manual(values = c( "#999999", "#E69F00" ) )
+```
+
+We run the two-sample t-test for variables `Unemployment rate` and `Target` to see if there is a relationship between them.
+
+The hypotheses are:
+
+$$
+\bigg\{
+\begin{matrix}
+          H_0:  \mu_{unemployment, \ dropout} = \mu_{unemployment, \ stayed \ enrolled}, \\
+          H_a:  \mu_{unemployment, \ dropout} \neq \mu_{unemployment, \ stayed \ enrolled}.
+\end{matrix}
+$$
+
+```{r}
+t.test( `Unemployment rate` ~ `Target`, data = dropout )
+```
+
+We do not reject the $H_0$, since the p-value (0.3979) is higher than $\alpha=0.05$. Thus, it means there is no statistically significant relationship between the target variable `Target` and `Unemployment`. It indicates that the variable `Unemployment` is not useful for predicting `Target`.
+
+## Investigate variable *Inflation rate*
+
+```{r}
+ggplot (data = dropout, aes(x=`Target`, y=`Inflation rate`)) + 
+  geom_boxplot(fill= c( "#999999", "#E69F00" ) )
+ggplot( data = dropout ) +
+  geom_density( aes( x = `Inflation rate`, fill = `Target`), alpha = 0.3 ) + scale_fill_manual(values = c( "#999999", "#E69F00" ) )
+```
+
+By just looking at the graphs we cannot conclude if `Inflation rate` factor is a good predictor for `Target` or not. For that we need to run the two-sample t-test for those variables:
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+          H_0:  \mu_{inflation ,\ dropout} = \mu_{inflation ,\ stayed \ enrolled}, \\
+          H_a:  \mu_{inflation ,\ dropout} \neq \mu_{inflation ,\ stayed \ enrolled}.
+\end{matrix}
+$$
+
+```{r}
+t.test( `Inflation rate` ~ `Target`, data = dropout )
+```
+
+We do not reject the $H_0$, since the p-value (0.06658) is higher than $\alpha=0.05$. Thus, it means there is no statistically significant relationship between the target variable `Target` and `Inflation rate`. It indicates that the variable `Inflation rate` is not useful for predicting `Target`.
+
+## Investigate variable *GDP*
+
+```{r}
+ggplot (data = dropout, aes(x=`Target`, y=`GDP`)) + 
+  geom_boxplot(fill= c( "#999999", "#E69F00" ) )
+ggplot( data = dropout ) +
+  geom_density( aes( x = `GDP`, fill = `Target`), alpha = 0.3 ) + scale_fill_manual(values = c( "#999999", "#E69F00" ) )
+```
+
+Looking at above box plots, median rates of the national GDP of the group of people who stayed enrolled is higher than in those students who dropped out. We still want to test if yearly national GDP relates to the dropout rates in universities.
+
+So, the hypotheses are:
+
+$$
+\bigg\{
+\begin{matrix}
+          H_0:  \mu_{GDP ,\ dropout} = \mu_{GDP ,\ stayed \ enrolled}, \\
+          H_a:  \mu_{GDP ,\ dropout} \neq \mu_{GDP ,\ stayed \ enrolled}.
+\end{matrix}
+$$
+
+```{r}
+t.test( `GDP` ~ `Target`, data = dropout )
+```
+
+We reject the $H_0$, since the p-value is 0.001988 and less than $\alpha=0.05$. True difference in means between dropped out students and students who stayed is not equal to 0. It means there is a statistically significant relationship between the target variable `Target` and `GDP`. It indicates that the variable `GDP` is indeed useful for predicting `Target`. The higher the yearly GDP - the lower the dropout rates in the universities. Maybe it is connected to the fact that during economical downturn more people drop out because can no longer sustain themselves studying in universities.
+
+## Detection of Correlated Variables
+
+First, we test categorical variables for correlation. For this we will use the Cramer's V notation and chi-square test.
+
+```{r}
+df <- data.frame(dropout$`Marital status`,dropout$Course, dropout$`Previous qualification`,dropout$`Mother's qualification`,dropout$`Mother's occupation`, dropout$`Father's qualification`, dropout$`Father's occupation`, dropout$`Displaced`, dropout$`Debtor`, dropout$`Tuition fees up to date`, dropout$`Gender`, dropout$`Scholarship holder`, dropout$`Application order`, dropout$`Evening attendance`, dropout$`International`) 
+
+f = function(x,y) {
+    tbl = df %>% select(x,y) %>% table()
+    chisq_pval = round(chisq.test(tbl)$p.value, 4)
+    cramV = round(cramersV(tbl), 4) 
+    data.frame(x, y, chisq_pval, cramV) }
+
+df_comb = data.frame(t(combn(sort(names(df)), 2)), stringsAsFactors = F)
+
+df_res = map2_df(df_comb$X1, df_comb$X2, f)
+
+df_res %>%
+ ggplot(aes(x,y,fill=chisq_pval))+
+  geom_tile()+
+  geom_text(aes(x,y,label=cramV), size = 2)+
+  scale_fill_gradient(low="pink", high="grey")+
+  theme_classic()
+```
+
+We do not observe any strong correlations between the categorical variables. The squares in grey represent the Cramer's V with an insignificant chi-square test.
+
+Secondly, we check numerical variables for correlations with Pearson's correlation.
+
+```{r}
+variable_list = c("Admission grade", "Previous qualification (grade)", "Age at enrollment", "GDP")
+
+cor_matrix = cor(dropout[, variable_list])
+
+ggcorrplot(cor_matrix, type = "lower", lab = TRUE)
+```
+
+We do not observe any strong correlations, that is why we will keep all of our variables for the classification algorithms.
+
+## EDA Resolution
+
+After the investigation of all variables, we excluded factors that hold no importance for our further research. We will use the following 19 variables (4 numerical and 15 categorical) in the classification algorithms:
+
+`Marital status`, `Course`, `Previous qualification`,`Mother's qualification`,`Mother's occupation`, `Father's qualification`, `Father's occupation`, `Displaced`, `Debtor`, `Tuition fees up to date`, `Gender`, `Scholarship holder`, `Application order`, `Evening attendance`, `International`, `Admission grade`, `Previous qualification (grade)`, `Age at enrollment`, `GDP`.
+
+# Modeling - Classification
+
+## Data preparation
+
+Firstly, we partition the *dropout* dataset into 2 groups: a train set (80%) and test set (20%).
+
+```{r}
+set.seed( 6 )
+data_sets = partition( data = dropout, prob = c( 0.8, 0.2 ) )
+train_set = data_sets $ part1
+test_set  = data_sets $ part2
+actual_test  = test_set $ `Target`
+```
+
+Secondly, we want to validate the partition with a Two-sample Z-test.
+
+Our hypotheses are as follows:
+
+$$
+\bigg\{
+\begin{matrix}
+    H_0: \pi_{dropout,train}   =  \pi_{dropout,test},   \\
+    H_a: \pi_{dropout,train} \neq \pi_{dropout,test }. 
+\end{matrix}
+$$
+
+```{r}
+x1 = sum( train_set $ `Target` == "Stayed.enrolled" )
+x2 = sum( test_set  $ `Target`== "Stayed.enrolled" )
+
+n1 = nrow( train_set )
+n2 = nrow( test_set  )
+
+prop.test( x = c( x1, x2 ), n = c( n1, n2 ) )
+```
+
+Since the p-value equals to 0.2832 which is higher than $\alpha=0.05$, thus we do not reject the $H_0$. Thus, the difference in the proportion of the students who dropped out and stayed enrolled is not statistically significant between the two groups (training set and test set). This implies that the partitioning is valid.
+
+## Classification with CART
+
+We create a formula for our further analysis based on the variables that have showed a high predictive power in the previous section.
+
+```{r}
+formula = `Target` ~ `Marital status`+ `Course`+ `Previous qualification`+`Mother's qualification`+`Mother's occupation`+ `Father's qualification`+ `Father's occupation`+ `Displaced`+ `Debtor`+ `Tuition fees up to date`+ `Gender`+ `Scholarship holder`+ `Application order`+ `Evening attendance`+ `International`+ `Admission grade`+ `Previous qualification (grade)`+ `Age at enrollment`+ `GDP`
+
+tree_cart = rpart( formula = formula, data = train_set, method = "class" )
+
+print( tree_cart )
+```
+
+```{r}
+rpart.plot( tree_cart,type = 4, extra = 104)
+```
+
+Because of the big amount of categories in on of the variables that the algorithm has chosen for prediction, the tree itself might appear as quite complex, therefore, it is better to orient yourself with the written description of the tree.
+
+In general, the tree indicate that the CART algorithm has chosen 3 predictors(`Tuition fees up to date`, `Age at enrollment` and `Course`). The variable `Tuition fees up to date` is the most important predictor. The tree categorizes students into 4 categories. The highest error rate of the tree is 0.38.
+
+##Classification with C50
+
+We will use the same set of predictors as in the previous section for the C50 algorithm.
+
+```{r}
+tree_C50 = C5.0( formula=formula, data = train_set ) 
+summary(tree_C50)
+```
+
+From the summary of the tree, we can conclude that the algorithm has chosen the following variables as primary predictors: `Tuition fees up to date`(main predictor), `GDP`, `Scholarship holder`, `Evening attnedance`, `Mother's occupation`, `Course`, `Age at enrollment`, `Gender`, `Application order`.
+
+## Classification with Random Forest
+
+We will use the same set of predictors as in the previous models. At first, we will need to rename our variables for the random forest algorithm to recognize them.
+
+```{r}
+lookup <- c(
+ marital.status = "Marital status", 
+ course= "Course", 
+ previous.q = "Previous qualification",
+ mother.q = "Mother's qualification",
+ mother.o = "Mother's occupation",
+ father.q  ="Father's qualification", 
+ father.o = "Father's occupation",
+ displaced = "Displaced",
+ debtor = "Debtor",
+ tuition= "Tuition fees up to date",
+ gender = "Gender",
+ scholarship = "Scholarship holder", 
+ application =  "Application order", 
+ evening.a = "Evening attendance",
+ international = "International", 
+ admission.grade=  "Admission grade", 
+ previous.q.g ="Previous qualification (grade)",
+ age = "Age at enrollment",
+ gdp = "GDP"
+)
+formula1 = `Target`~ marital.status+course+previous.q+mother.q+mother.o+father.q+father.o+displaced+debtor+tuition+gender+scholarship+application+evening.a+international+admission.grade+previous.q.g+age+gdp
+```
+
+We also need to rename those variables in the train set, test set and actual set and create new data frames.
+
+```{r}
+train_set1 = rename(train_set, all_of(lookup))
+test_set1 = rename(test_set, all_of(lookup))
+actual_test1 = test_set1$`Target`
+```
+
+Finally, we can apply the random forest algorithm to our data set. We will write 2 algorithms, one with 10 trees, the other one with 100 trees to see whether the increased complexity of the algorithm will reduce error.
+
+```{r}
+random_forest = randomForest( formula = formula1, data = train_set1, ntree = 10 )
+predict_random_forest = predict( random_forest, test_set1 )
+mse( predict_random_forest, actual_test1 )
+```
+
+The error rate for the algorithm with 10 trees is 0.233333
+
+```{r}
+random_forest = randomForest( formula = formula1, data = train_set1, ntree = 100 )
+predict_random_forest = predict( random_forest, test_set1 )
+mse( predict_random_forest, actual_test1 )
+```
+
+The error rate for the algorithm with 100 trees is 0.20666667, the error has decreased.
+
+Additionally, we will check what is the optimal number of trees.
+
+```{r}
+plot( random_forest )
+```
+
+From the plot, we see that if the number of trees is higher than about 80, we will have a munimal error. Therefore, we will continue working with an algorithm with 100 trees.
+
+```{r}
+random_forest = randomForest( formula = formula1, data = train_set1, ntree = 100 )
+
+varImpPlot( random_forest )
+```
+
+We can see that the model chose `Tuition fees up to date` and `Course` as the most important variables and `Evening attendance` and `International` as the least important variables for predicting dropout.
+
+## Classification with Logistic Regression
+
+The target variable `Target` in our dataset is binary. For our case, the binary logistic regression is the most suitable regression model to predict relationship between a binary target variable and a set of independent variables. By using logistic regression we would classify whether or not a student will dropout from the university.
+
+For the Logistic Regression Model we use the same formula as in previous classification algorithms.
+
+The following 19 predictors are used in the formula:
+
+```{r}
+formula = `Target` ~ `Marital status`+ `Course`+ `Previous qualification`+`Mother's qualification`+`Mother's occupation`+ `Father's qualification`+ `Father's occupation`+ `Displaced`+ `Debtor`+ `Tuition fees up to date`+ `Gender`+ `Scholarship holder`+ `Application order`+ `Evening attendance`+ `International`+ `Admission grade`+ `Previous qualification (grade)`+ `Age at enrollment`+ `GDP`
+```
+
+To implement the logistic regression model, we use the `glm()` command with "binomial" setting meaning it is returning binomial predictions of "Dropout" or "Stayed.enrolled".
+
+```{r}
+reg_all = glm( formula = formula, family = "binomial", data = train_set )
+summary(reg_all)
+```
+
+`glm` regression function automatically splits categorical factors (with k categories) that are present in the formula into (k-1) dummy variables. It also sets first category of every categorical variable as a reference category. For instance, `Marital status` initially had 6 categories so the regression created and picked 5 dummy variables: `Marital status`Married , `Marital status`Divorced, `Marital status`Widowed, `Marital status`Facto.Union, and `Marital status`Legally.Separated.
+
+We got a long list of different coefficients for the regression. Looking at the significance, dummy variables that were derived from the same categorical predictor have different significance levels. Some dummy variable's coefficients are not significant at all, whereas, at the same time, other dummies are significant. We can only choose whether we should use the independent categorical variables as a whole or not. In other words, we should only see whether the categorical variable as a whole is significant or not. We cannot include some categories of a variable and exclude some categories having insignificant difference.
+
+It is reasonable to exclude categorical variables from the regression which do not have any significant dummy. So we exclude `Previous qualification`, `Mother's qualification`, `Displaced`, `Application order`, `Evening attendance`
+
+```{r}
+formula_new = `Target` ~ `Marital status`+ `Course`+`Mother's occupation`+ `Father's qualification`+ `Father's occupation`+ `Debtor`+ `Tuition fees up to date`+ `Gender`+ `Scholarship holder`+ `International`+ `Admission grade`+ `Previous qualification (grade)`+ `Age at enrollment`+ `GDP`
+```
+
+```{r}
+reg_some = glm( formula = formula_new, family = "binomial", data = train_set )
+summary(reg_some)
+```
+
+We can make decision about inclusion of the variables by checking a likelihood ratio test. It is performed by estimating two models and comparing the fit of one model to the fit of the other. Removing predictor variables from a model will almost always make the model fit less well but it is necessary to test whether the observed difference in model fit is statistically significant. It tests whether this difference is statistically significant.
+
+```{r}
+anova(reg_all, reg_some, test="LRT")
+```
+
+Since p-value is more than 0.05, it means the difference is insignificant and the variables `Previous qualification`, `Mother's qualification`, `Displaced`, `Application order`, and `Evening attendance` should be excluded from the model.
+
+### Verifying Model Assumptions
+
+Before a regression model can be implemented, the requisite model assumptions must be verified. The assumptions for the Logistic Regression model are different from other regressions like Linear Regression model.
+
+Assumptions for Logistic Regression model are:
+
+> The outcome is a binary or dichotomous variable like yes vs no, positive vs negative, 1 vs 0. There is a linear relationship between the logit of the outcome and each predictor variables. There is no influential values (extreme values or outliers) in the continuous predictors. There is no high intercorrelations (i.e. multicollinearity) among the predictors.
+
+First assumption is met because our dependent variable `Target` has only two outcomes `Dropout` and `Stayed.enrolled`.
+
+Second assumption may be checked looking at the following plots containing numerical variables:
+
+```{r}
+predictions <- predict(reg_some, type = "link")
+plot( train_set$`Admission grade`, predictions, xlab = "Admission grade", ylab = "Predicted Log-Odds")
+plot( train_set$`Previous qualification (grade)`, predictions, xlab = "Previous qualification (grade)", ylab = "Predicted Log-Odds")
+plot( train_set$`Age at enrollment`, predictions, xlab = "Age at enrollment", ylab = "Predicted Log-Odds")
+plot( train_set$`GDP`, predictions, xlab = "GDP", ylab = "Predicted Log-Odds")
+```
+
+We can see that every numeric variable has linear realtionship with the logit of the outcome `Target` except variable `GDP`. For the assumption to be met we will exclude `GDP` from the final regression model.
+
+Third assumption is done and fulfilled during `Outliers and Unusual values` section of the research.
+
+Forth assumption is done and fulfilled during `Detection of Correlated Variables` section of the research.
+
+So in the end we illuminate `GDP` predictor because it does not fit our model assumptions.
+
+```{r}
+formula_last = `Target` ~ `Marital status`+ `Course`+`Mother's occupation`+ `Father's qualification`+ `Father's occupation`+ `Debtor`+ `Tuition fees up to date`+ `Gender`+ `Scholarship holder`+ `International`+ `Admission grade`+ `Previous qualification (grade)`+ `Age at enrollment`
+```
+
+Here is our final Logistic Regression Model:
+
+```{r}
+log_reg = glm( formula = formula_last, family = "binomial", data = train_set )
+summary(log_reg)
+```
+
+# Model Evaluation
+
+Based on our results, we will determine which classification algorithms is more suitable for the `dropout` database. To compare classification models we will use such comparison tools like:
+
+-   Confusion Matrix
+-   MSE
+-   ROC curve
+-   AUC (Area Under the ROC curve)
+
+## Confusion Matrix and MSE for CART
+
+```{r}
+tree_cart = rpart( formula = formula, data = train_set, method = "class" )
+predict_cart = predict( tree_cart, test_set, type = "class" )
+conf.mat( predict_cart, actual_test )
+conf.mat.plot( predict_cart, actual_test )
+print(paste0("MSE = ", mse( predict_cart, actual_test ) ))
+```
+
+We observe that the model has "`r conf.mat( predict_cart, actual_test )[ 1, 2 ]` + `r conf.mat( predict_cart, actual_test )[ 2, 1 ]` = `r conf.mat( predict_cart, actual_test )[ 1, 2 ] + conf.mat( predict_cart, actual_test )[ 2, 1 ]`" wrong predictions and mse `r round(  mse( predict_cart, actual_test ), 3 )`.
+
+## Confusion Matrix and MSE for C50
+
+```{r}
+tree_C50 = C5.0( formula = formula, data = train_set, type = "class" ) 
+predict_C50 = predict( tree_C50, test_set, type = "class" )
+conf.mat( predict_C50, actual_test )
+conf.mat.plot( predict_C50, actual_test )
+print(paste0("MSE = ", mse( predict_C50, actual_test ) ))
+```
+
+We observe that the model has "`r conf.mat( predict_C50, actual_test )[ 1, 2 ]` + `r conf.mat( predict_C50, actual_test )[ 2, 1 ]` = `r conf.mat( predict_C50, actual_test )[ 1, 2 ] + conf.mat( predict_C50, actual_test )[ 2, 1 ]`" wrong predictions and mse `r round( mse( predict_C50, actual_test ), 3 )`.
+
+The error rate is slightly higher than in the CART model.
+
+## Confusion Matrix and MSE for Random forest
+
+```{r}
+predict_random_forest = predict( random_forest, test_set1 )
+conf.mat( predict_random_forest, actual_test1 )
+conf.mat.plot( predict_random_forest, actual_test1, main = "Random Forest" )
+print(paste0("MSE = ", mse( predict_random_forest, actual_test1 )))
+```
+
+We observe that the model has `r conf.mat( predict_random_forest, actual_test1 )[ 1, 2 ]` + `r conf.mat( predict_random_forest, actual_test1 )[ 2, 1 ]` = `r conf.mat( predict_random_forest, actual_test1 )[ 1, 2 ] + conf.mat( predict_random_forest, actual_test1 )[ 2, 1 ]`" wrong predictions and mse `r round( mse( predict_random_forest, actual_test1 ), 3 )`
+
+The error rate is one of the lowest out all of the models that we have checked.
+
+## Confusion Matrix and MSE for Logistic Regression
+
+```{r}
+predict_logreg = predict( log_reg, test_set )
+cf_logreg = conf.mat( as.numeric(predict_logreg>0.5), actual_test )
+cf_logreg
+print(paste0("MSE = ", mse( as.numeric(predict_logreg>0.5), actual_test )  ))
+conf.mat.plot( as.numeric(predict_logreg>0.5), actual_test )
+```
+
+We observe that the model has "`r cf_logreg[ 1, 2 ]` + `r cf_logreg[ 2, 1 ]` = `r cf_logreg[ 1, 2 ] + cf_logreg[ 2, 1 ]`" wrong predictions and mse `r round( mse( as.numeric(predict_logreg>0.5), actual_test ), 3 )`
+
+## ROC curve
+
+To visualize the model performance between the classification algorithms, we report the ROC curve plot as well as AUC (Area Under the Curve):
+
+```{r}
+prob_cart = predict( tree_cart, test_set, type = "prob" )[ , 1 ]
+roc_cart = roc( actual_test, prob_cart )
+
+prob_C50 = predict( tree_C50, test_set, type = "prob" )[ , 1 ]
+roc_C50 = roc( actual_test, prob_C50 )
+
+prob_random_forest = predict( random_forest, test_set1, type = "prob" )[ , 1 ]
+roc_random_forest = roc( actual_test1, prob_random_forest )
+
+prob_logreg = predict( log_reg, test_set , type = "response")
+roc_prob_reg = roc(actual_test, prob_logreg)
+
+
+ggroc( list( roc_cart, roc_C50, roc_random_forest, roc_prob_reg ), size = 0.8 ) + 
+    theme_minimal() + ggtitle( "ROC plots with AUC for 4 outcomes") +
+  scale_color_manual( values = 5:10, 
+    labels = c( paste( "Regression; AUC=", round( auc( roc_prob_reg ), 3 ) ) , 
+                paste( "CART; AUC=", round( auc(  roc_C50 ), 3 ) ), 
+                paste( "C50; AUC=", round( auc( roc_cart ), 3 ) ), 
+                paste( "Random Forest; AUC=", round( auc( roc_random_forest ), 3 ) ) ) ) +
+  theme( legend.title = element_blank() ) +
+  theme( legend.position = c( .7, .3 ), text = element_text( size = 17 ) )
+```
+
+# Conclusion
+
+To make a conclusion about the model that is the most efficient for predicting whether a student will dropout or stay enrolled we will first look at the error rates of each model:
+
+-   **CART algorithm** has MSE = `r round(  mse( predict_cart, actual_test ), 3 )` ,
+-   **C5.0 algorithm** has MSE = `r round( mse( predict_C50, actual_test ), 3 )` ,
+-   **Random Forest algorithm** has MSE = `r round( mse( predict_random_forest, actual_test1 ), 3 )` ,
+-   **Logistic Regression** has MSE = `r round( mse( as.numeric(predict_logreg>0.5), actual_test ), 3 )`. 
+
+**Random Forest** algorithm produces results with the least error, while **Logistic Regression** has the highest error rate, almost 6 times as large as the error for **Random Forest**. On the contrary, **Logistic Regression** has AUC value slightly higher than **Random Forest** does.
+
+Based on the arguments above, we will choose **Random Forest** as the best fit algorithm for predicting dropout. Therefore, we will briefly summarize the choices of this algorithm for the most accurate and most inaccurate predictors to help us make generalizable conclusions based on the dataset. The Random forest algorithm has chosen the following most important predictors: `Tuitions up to date` and `Course` were the leading ones. `Age at enrollemnt`, `Admission grade`, `Father's occupation`, `Mother's occupation`, `Previous qualification (grade)` and `GDP`in the descending order were placed with a considerate distance from the first 2 main predictors. Other variables `Mother's qualification`, `Father's qualification`, `Scholarship holder`, `Application order`, `Debtor`, `Gender`, `Previous qualification`, `Displaced`, `Marital status`, `Evening attendance`, `International` in the descending order were chosen as the least powerful predictors.
+
+Our initial goal was to determine the set of factors that influence the student's decision the most. Those sets of factors were the student's family history with higher education institutions and the social class background of the student, the student's characteristics as well as factors that determine the state of the economy at the time when a specific response was collected.
+
+With the use of the classification models, we derived that the possibility of a dropout can be approached early on during the admission process. The fact that the most powerful predictor of students' dropout is the payment of the tuition is very intuitive, as those students, who are planning on dropping out will not prepay their tuition in advance. One of the key determinants was the course that the student is applying to, as some courses are a lot more academically challenging than others. Additionally, the age of enrollment has high predictive power, these finding suggests that the university's administration should acknowledge the difficulties that might incentivize older students to drop out. For example, the difficulty to establish social relations with people, who are a lot younger than themselves. The fact that the previous grades and admission grades have a high impact on the student's choice to drop out is also very intuitive, as it suggests whether the student can have high performance in an academically rigorous environment. Our findings also imply that the choice to drop out is highly related to the student's social background (Father's and Mother's occupation). Surprisingly, we do not have enough statistical evidence that the student's choice to drop out is related to the state of the economy, the student is experiencing, although economic theories suggest that, for example, high unemployment rates would incentivize people to stay in the universities. However, we have not found any association between the unemployment rate and inflation rate with dropout. The GDP showed some association with the target variable, however, it was not classified very high on the importance of predicting dropout.
+
+Our research suggests that further research focuses more on the social background of the student and personal academic achievements rather than economic-wide trends in the country when predicting the chance of a particular person dropping out.
+
+# Reference List
+
+Beaulac, C. & Rosenthal, J.S.(2019). Predicting university Students? academic success and major using random forests. Res. High. Educ. 60, 1048?1064. <https://doi.org/10.1007/s11162-019-09546-y>
+
+Dobson, A., & Henderson, R. (2003). Diagnostics for Joint Longitudinal and Dropout Time Modeling. Biometrics, 59(4), 741-751. <https://doi.org/10.1111/j.0006-341X.2003.00087.x>
+
+H., Dzemyda, G., Moreira, F., Ramalho Correia, A.M. (eds) Trends and Applications in Information Systems and Technologies. WorldCIST 2021. Advances in Intelligent Systems and Computing, vol 1365. Springer, Cham. <https://doi.org/10.1007/978-3-030-72657-7_16>
+
+Kehm, B. M., Larsen, M. R., & Sommersel, H. B. (2019). Student dropout from universities in Europe: A review of empirical literature. Hungarian Educational Research Journal, 9(2), 147-164. <https://doi.org/10.1556/063.9.2019.1.18>
+
+Martins, M.V., Tolledo, D., Machado, J., Baptista, L.M.T., Realinho, V. (2021). Early Prediction of student's Performance in Higher Education: A Case Study. In: Rocha, A., Adeli,
+
+Migueis, V.L., Freitas, A., Garcia, P.J.V., Silva, A.: Early segmentation of students according to their academic performance: a predictive modelling approach. Decis. Support Syst. 115, 36'51 (2018). <https://doi.org/10.1016/j.dss.2018.09.001>
+
+Ortiz, A & Dehon, C.(September,2013). Roads to Success in the Belgian French Community?s Higher Education System: Predictors of Dropout and Degree Completion at the Universite Libre de Bruxelles. Res High Educ, 54, 693?723. <https://doi.org/10.1007/s11162-013-9290-y>
+
+Sosu, E. M. & Pheunpha, P. (2019). Trajectory of University Dropout: Investigating the Cumulative Effect of Academic Vulnerability and Proximity to Family Support. Frontiers in Education, 4, 409050. <https://doi.org/10.3389/feduc.2019.00006>
