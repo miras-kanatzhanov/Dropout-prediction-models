@@ -2,15 +2,15 @@
 With the use of the classification models, we derived that the possibility of a dropout can be approached early on during the admission process.
 
 ### Conclusion
-To make a conclusion about the model that is the most efficient for predicting whether a student will dropout or stay enrolled we will first look at the error rates of each model:
+To make a conclusion about the model that is the most efficient for predicting whether a student will dropout or stay enrolled we will first look at the error rates of each model.
 
-CART algorithm has MSE = 0.217 ,
+CART algorithm has MSE = 0.217 
 
-C5.0 algorithm has MSE = 0.218 ,
+C5.0 algorithm has MSE = 0.218 
 
-Random Forest algorithm has MSE = 0.218 ,
+Random Forest algorithm has MSE = 0.218 
 
-Logistic Regression has MSE = 1.219.
+Logistic Regression has MSE = 1.219
 
 Random Forest algorithm produces results with the least error thus making it the best predictor.
 
